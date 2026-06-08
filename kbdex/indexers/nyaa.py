@@ -19,6 +19,7 @@ Nyaa's table structure (8 physical <td> elements per row):
 import asyncio
 import logging
 import re
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any
@@ -82,6 +83,7 @@ def _load_config(indexer_name: str, defaults: NyaaSettings) -> dict:
         root = ET.parse(path).getroot()
         return {child.tag: child.text for child in root if child.text is not None}
     except Exception:
+        logger.exception("Failed to parse %s config, using defaults", indexer_name)
         return {}
 
 
@@ -205,17 +207,22 @@ class NyaaAdapter:
         max_pages = int(opts.get("max_pages", self._cfg.max_pages))
 
         all_items: list[dict] = []
-        for page in range(1, max_pages + 1):
-            url = (
-                f"{self.base_url}/?f={filter_flag}&c={category}"
-                f"&q={quote(query)}&p={page}"
-            )
-            content = await self._fetch_with_retry(url)
-            items = _parse_html(content, self.base_url)
-            all_items.extend(items)
+        async with httpx.AsyncClient(
+            timeout=self._cfg.request_timeout_seconds,
+            follow_redirects=True,
+            headers={"User-Agent": "kbdex/0.1 (personal anime torrent search)"},
+        ) as client:
+            for page in range(1, max_pages + 1):
+                url = (
+                    f"{self.base_url}/?f={filter_flag}&c={category}"
+                    f"&q={quote(query)}&p={page}"
+                )
+                content = await self._fetch_with_retry(url, client)
+                items = _parse_html(content, self.base_url)
+                all_items.extend(items)
 
-            if len(items) < _RESULTS_PER_PAGE:
-                break
+                if len(items) < _RESULTS_PER_PAGE:
+                    break
 
         return all_items
 
@@ -240,21 +247,19 @@ class NyaaAdapter:
         return results
 
     async def health_check(self) -> IndexerHealth:
-        import time as _time
-
         if self._circuit_breaker.is_open:
             return IndexerHealth(
                 status="down",
                 last_checked=datetime.now(timezone.utc),
             )
-        start = _time.monotonic()
+        start = time.monotonic()
         try:
             async with httpx.AsyncClient(
                 timeout=self._cfg.request_timeout_seconds
             ) as client:
                 resp = await client.head(self.base_url)
                 resp.raise_for_status()
-            elapsed_ms = int((_time.monotonic() - start) * 1000)
+            elapsed_ms = int((time.monotonic() - start) * 1000)
             status = "ok" if elapsed_ms < 3000 else "degraded"
         except Exception:
             status = "down"
@@ -263,18 +268,13 @@ class NyaaAdapter:
             last_checked=datetime.now(timezone.utc),
         )
 
-    async def _fetch_with_retry(self, url: str) -> bytes:
+    async def _fetch_with_retry(self, url: str, client: httpx.AsyncClient) -> bytes:
         last_exc: Exception = RuntimeError("no attempts made")
         for attempt in range(self.max_retries + 1):
             try:
                 await self._rate_limiter.acquire()
-                async with httpx.AsyncClient(
-                    timeout=self._cfg.request_timeout_seconds,
-                    follow_redirects=True,
-                    headers={"User-Agent": "kbdex/0.1 (personal anime torrent search)"},
-                ) as client:
-                    resp = await client.get(url)
-                    resp.raise_for_status()
+                resp = await client.get(url)
+                resp.raise_for_status()
                 self._circuit_breaker.record_success()
                 return resp.content
             except (httpx.HTTPError, httpx.TimeoutException) as exc:

@@ -22,7 +22,7 @@ def list_indexers() -> list[str]:
 
 
 def reload_indexers() -> None:
-    """Rebuild adapter instances, picking up any changes to data/ui_settings.json."""
+    """Rebuild adapter instances, picking up any changes to data/config/*.xml."""
     global INDEXERS, _registry
     INDEXERS = [NyaaAdapter(), SukebeiAdapter()]
     _registry = {i.name: i for i in INDEXERS}

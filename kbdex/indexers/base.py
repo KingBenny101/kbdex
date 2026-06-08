@@ -42,11 +42,12 @@ class RateLimiter:
 
     async def acquire(self) -> None:
         async with self._lock:
-            now = asyncio.get_event_loop().time()
+            loop = asyncio.get_running_loop()
+            now = loop.time()
             wait = self._min_interval - (now - self._last_request)
             if wait > 0:
                 await asyncio.sleep(wait)
-            self._last_request = asyncio.get_event_loop().time()
+            self._last_request = loop.time()
 
 
 class CircuitBreaker:
