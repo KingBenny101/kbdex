@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -72,7 +73,7 @@ async def root():
     return RedirectResponse(url="/ui/search")
 
 
-app.mount("/static", StaticFiles(directory="kbdex/static"), name="static")
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
 app.include_router(search.router)
 app.include_router(titles.router)

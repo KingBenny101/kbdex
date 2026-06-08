@@ -15,7 +15,9 @@ from kbdex.models import QueryParams
 from kbdex.search import run_search
 
 router = APIRouter()
-templates = Jinja2Templates(directory="kbdex/templates")
+# Resolve from this file's location so the app works regardless of CWD.
+_TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,21 @@ async def search_post(
             from kbdex.animelists import mapper
             id_type_key, id_val_key = next(iter(foreign.items()))
             anidb_id = mapper.resolve(id_type_key, id_val_key)
+
+        if season_val is not None and anidb_id is None:
+            raise APIError(
+                422,
+                "INVALID_PARAM_COMBO",
+                "'season' is only meaningful when an ID param is also provided.",
+                param="season",
+            )
+        if episode_val is not None and season_val is None:
+            raise APIError(
+                422,
+                "INVALID_PARAM_COMBO",
+                "'episode' requires 'season' to also be provided.",
+                param="episode",
+            )
 
         params = QueryParams(
             anidb_id=anidb_id,
