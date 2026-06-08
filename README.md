@@ -39,16 +39,20 @@ MAL ID / AniList ID / ...
 Requires [Docker](https://docs.docker.com/get-docker/).
 
 ```bash
+docker volume create kbdex-data
+
 docker run -d \
   --name kbdex \
   -p 8000:8000 \
-  -v ./data:/app/data \
+  -v kbdex-data:/app/data \
   ghcr.io/kingbenny101/kbdex:latest
 ```
 
 Or with Docker Compose:
 
 ```bash
+git clone https://github.com/kingbenny101/kbdex.git
+cd kbdex
 docker compose up -d
 ```
 

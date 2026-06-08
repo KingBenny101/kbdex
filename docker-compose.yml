@@ -4,8 +4,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data
-    # Override any setting via KBDEX_* env vars, e.g.:
-    # environment:
-    #   KBDEX_NYAA_MAX_PAGES: "5"
+      - kbdex-data:/app/data
     restart: unless-stopped
+
+volumes:
+  kbdex-data:
