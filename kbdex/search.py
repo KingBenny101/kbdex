@@ -110,6 +110,8 @@ def _try_guessit(title: str) -> ParsedInfo:
             episode_number = None
 
         season = g.get("season")
+        if isinstance(season, list):
+            season = season[0]
         anime_season = f"{int(season):02d}" if season is not None else None
 
         return ParsedInfo(
@@ -118,7 +120,7 @@ def _try_guessit(title: str) -> ParsedInfo:
             video_resolution=g.get("screen_size"),
             release_group=g.get("release_group"),
             video_codec=g.get("video_codec"),
-            source=str(g.get("source")) if g.get("source") else None,
+            source=g.get("source"),
             audio_codec=g.get("audio_codec"),
         )
     except Exception:
@@ -127,8 +129,6 @@ def _try_guessit(title: str) -> ParsedInfo:
 
 def _parse_torrent_info(title: str) -> ParsedInfo:
     a = _try_anitopy(title)
-    if a.episode_number is not None:
-        return a
     g = _try_guessit(title)
     return ParsedInfo(
         episode_number=a.episode_number or g.episode_number,
