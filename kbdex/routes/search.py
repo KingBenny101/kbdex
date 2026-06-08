@@ -23,8 +23,8 @@ router = APIRouter()
     },
     summary="Search for anime torrents",
     description=(
-        "Resolves an AniDB ID to all title variants (romanised, Japanese, English), "
-        "constructs search queries, and returns matching torrents from the requested indexers."
+        "Resolves an AniDB ID to title variants, searches indexers with the show title, "
+        "parses torrent filenames with anitopy, and filters results by season/episode."
     ),
 )
 async def search(
