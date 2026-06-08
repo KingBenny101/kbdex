@@ -3,14 +3,16 @@ import logging
 import re
 from typing import Optional
 
+import anitopy
 import httpx
 
 from kbdex.anidb.dump import resolve_titles
-from kbdex.cache import make_search_cache_key, search_cache
+from kbdex.cache import disk_search_cache, make_search_cache_key, search_cache
 from kbdex.config import settings
 from kbdex.indexers import get_indexer
 from kbdex.models import (
     IndexerError,
+    ParsedInfo,
     QueryParams,
     SearchResponse,
     TitleEntry,
@@ -22,6 +24,13 @@ logger = logging.getLogger(__name__)
 _INFO_HASH_RE = re.compile(
     r"xt=urn:btih:([a-fA-F0-9]{40}|[A-Z2-7]{32})", re.IGNORECASE
 )
+
+
+def _safe_int(s: str) -> Optional[int]:
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        return None
 
 
 def _extract_info_hash(magnet: str) -> str | None:
@@ -44,77 +53,94 @@ def _deduplicate(results: list[TorrentResult]) -> list[TorrentResult]:
     return out
 
 
-def build_queries(
-    titles: list[TitleEntry],
-    q: Optional[str],
-    season: Optional[int],
-    episode: Optional[int],
-) -> list[str]:
-    """Construct prioritised, deduplicated search query strings."""
-    if q:
-        return [q]
-
+def _extract_title_queries(titles: list[TitleEntry]) -> list[str]:
+    """Extract bare title strings for indexer queries, no season/episode formatting."""
     xjat = next(
         (t.value for t in titles if t.type == "main" and t.language == "x-jat"), None
     )
     _ja_raw = next(
         (t.value for t in titles if t.language == "ja" and t.type in ("main", "official")), None
     )
-    # AniDB often appends a romanised subtitle after the Japanese script
-    # e.g. "進撃の巨人 attack on titan" → strip the ASCII tail so Nyaa finds raw releases
+    # Strip romanised ASCII tail from Japanese titles (e.g. "進撃の巨人 attack on titan")
     ja = re.sub(r"\s+[a-zA-Z].*$", "", _ja_raw).strip() if _ja_raw else None
     en_official = next(
         (t.value for t in titles if t.type == "official" and t.language == "en"), None
     )
-    # Deduplicate while preserving priority order: romanised → japanese → english
-    seen_titles: set[str] = set()
-    candidates: list[str] = []
-    for v in [xjat, ja, en_official]:
-        if v and v not in seen_titles:
-            seen_titles.add(v)
-            candidates.append(v)
-    if not candidates and titles:
-        candidates = [titles[0].value]
-
-    if not candidates:
-        return []
-
-    queries: list[str] = []
-
-    if season is not None and episode is not None:
-        ep = f"{episode:02d}"
-        seas = f"{season:02d}"
-        for title in candidates:
-            queries.append(f"{title} - {ep}")
-            queries.append(f"{title} S{seas}E{ep}")
-        if candidates:
-            queries.append(f"{candidates[0]} {ep}")
-    elif season is not None:
-        for title in candidates:
-            queries.append(f"{title} Season {season}")
-            queries.append(f"{title} S{season:02d}")
-    else:
-        for title in candidates:
-            queries.append(title)
 
     seen: set[str] = set()
-    deduped: list[str] = []
-    for query in queries:
-        norm = " ".join(query.lower().split())
-        if norm not in seen:
-            seen.add(norm)
-            deduped.append(query)
+    queries: list[str] = []
+    for v in [xjat, ja, en_official]:
+        if v and v not in seen:
+            seen.add(v)
+            queries.append(v)
 
-    return deduped
+    if not queries and titles:
+        queries = [titles[0].value]
+
+    return queries
+
+
+def _parse_torrent_info(title: str) -> ParsedInfo:
+    try:
+        parsed = anitopy.parse(title)
+        return ParsedInfo(
+            episode_number=parsed.get("episode_number"),
+            anime_season=parsed.get("anime_season"),
+            video_resolution=parsed.get("video_resolution"),
+            release_group=parsed.get("release_group"),
+            video_codec=parsed.get("video_codec"),
+            source=parsed.get("source"),
+            audio_codec=parsed.get("audio_codec"),
+        )
+    except Exception:
+        return ParsedInfo()
+
+
+def _matches_episode(
+    parsed: ParsedInfo,
+    season: Optional[int],
+    episode: Optional[int],
+) -> bool:
+    if season is None and episode is None:
+        return True
+
+    if season is not None and parsed.anime_season is not None:
+        try:
+            if int(parsed.anime_season) != season:
+                return False
+        except ValueError:
+            pass
+
+    if episode is not None:
+        ep_str = parsed.episode_number
+        if ep_str is None:
+            return True  # no episode tag — likely a batch, include it
+        if "-" in ep_str:
+            try:
+                lo, hi = ep_str.split("-", 1)
+                if not (int(lo) <= episode <= int(hi)):
+                    return False
+            except ValueError:
+                pass
+        else:
+            try:
+                if int(ep_str) != episode:
+                    return False
+            except ValueError:
+                pass
+
+    return True
 
 
 async def _search_one(
     indexer_name: str,
     query: str,
-) -> tuple[list[TorrentResult], bool, Optional[IndexerError]]:
+    anidb_id: Optional[int] = None,
+) -> tuple[list[dict], bool, Optional[IndexerError]]:
     """
     Run a single (indexer, query) pair.
-    Returns (results, from_cache, error_or_None).
+    Returns (result_dicts, from_cache, error_or_None).
+    Result dicts are TorrentResult-serialised (model_dump mode='json').
     """
     adapter = get_indexer(indexer_name)
     if adapter is None:
@@ -125,16 +151,29 @@ async def _search_one(
             retryable=False,
         )
 
-    cache_key = make_search_cache_key(query, indexer_name)
-    cached = search_cache.get(cache_key)
-    if cached is not None:
-        return cached, True, None
+    if anidb_id is not None:
+        cached = disk_search_cache.get(anidb_id, indexer_name)
+        if cached is not None:
+            return cached, True, None
+    else:
+        cache_key = make_search_cache_key(query, indexer_name)
+        cached = search_cache.get(cache_key)
+        if cached is not None:
+            return cached, True, None
 
     try:
         raw = await adapter.search(query)
         results = adapter.parse(raw)
-        search_cache.set(cache_key, results, settings.search_cache_ttl_seconds)
-        return results, False, None
+        # Serialise to JSON-compatible dicts (mode="json" converts datetime → ISO string)
+        result_dicts = [r.model_dump(mode="json") for r in results]
+
+        if anidb_id is not None:
+            disk_search_cache.set(anidb_id, indexer_name, result_dicts)
+        else:
+            cache_key = make_search_cache_key(query, indexer_name)
+            search_cache.set(cache_key, result_dicts, settings.search_cache_ttl_seconds)
+
+        return result_dicts, False, None
     except RuntimeError as exc:
         return [], False, IndexerError(
             indexer=indexer_name,
@@ -153,32 +192,24 @@ async def _search_one(
 
 
 async def run_search(params: QueryParams) -> SearchResponse:
-    warnings: list[str] = []
-
     # Step 1 – Resolve AniDB titles
     resolved_titles: list[TitleEntry] = []
     if params.anidb_id is not None:
         resolved_titles, _ = resolve_titles(params.anidb_id)
 
-    # Step 2 – Build queries
-    queries = build_queries(resolved_titles, params.q, params.season, params.episode)
-
-    if params.season is not None and params.episode is not None:
-        warnings.append(
-            "season/episode is used for query formatting only; "
-            "verify the absolute episode number in release filenames."
-        )
+    # Step 2 – Build queries (title strings only, no season/episode formatting)
+    queries = [params.q] if params.q else _extract_title_queries(resolved_titles)
 
     # Step 3 – Fan out: each (indexer, query) pair runs concurrently
     tasks = [
-        _search_one(indexer_name, query)
+        _search_one(indexer_name, query, params.anidb_id)
         for indexer_name in params.indexers
         for query in queries
     ]
     outcomes = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Step 4 – Aggregate
-    all_results: list[TorrentResult] = []
+    all_dicts: list[dict] = []
     errors_by_indexer: dict[str, IndexerError] = {}
     all_from_cache = True
 
@@ -186,28 +217,51 @@ async def run_search(params: QueryParams) -> SearchResponse:
         if isinstance(outcome, Exception):
             logger.exception("Unexpected error during search gather: %s", outcome)
             continue
-        results, from_cache, error = outcome
+        result_dicts, from_cache, error = outcome
         if error:
             errors_by_indexer[error.indexer] = error
         else:
-            all_results.extend(results)
+            all_dicts.extend(result_dicts)
             if not from_cache:
                 all_from_cache = False
 
+    # Step 5 – Reconstruct TorrentResult objects and attach parsed info
+    all_results: list[TorrentResult] = []
+    for item in all_dicts:
+        result = TorrentResult.model_validate(item)
+        result.parsed = _parse_torrent_info(result.title)
+        all_results.append(result)
+
+    # Step 6 – Filter by season/episode if requested
+    if params.season is not None or params.episode is not None:
+        all_results = [
+            r for r in all_results
+            if _matches_episode(r.parsed, params.season, params.episode)
+        ]
+
+    # Step 7 – Deduplicate and sort
+    # When filtering by episode, exact single-episode matches rank before batches/unparsed.
     all_results = _deduplicate(all_results)
-    all_results.sort(key=lambda r: r.seeders, reverse=True)
+    episode = params.episode
+    def _sort_key(r: TorrentResult) -> tuple[int, int]:
+        if episode is not None and r.parsed and r.parsed.episode_number:
+            ep_str = r.parsed.episode_number
+            is_exact = "-" not in ep_str and _safe_int(ep_str) == episode
+            tier = 0 if is_exact else 1
+        else:
+            tier = 0 if episode is None else 1
+        return (tier, -r.seeders)
+
+    all_results.sort(key=_sort_key)
 
     errors = list(errors_by_indexer.values())
-    partial = bool(errors) and bool(all_results)
 
     return SearchResponse(
         query=params,
         resolved_titles=resolved_titles,
-        queries_executed=queries,
         results=all_results,
         total_results=len(all_results),
         from_cache=all_from_cache and bool(all_results),
         errors=errors,
-        warnings=warnings,
-        partial=partial,
+        partial=bool(errors) and bool(all_results),
     )
