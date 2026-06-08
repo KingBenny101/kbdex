@@ -9,6 +9,16 @@ class TitleEntry(BaseModel):
     value: str
 
 
+class ParsedInfo(BaseModel):
+    episode_number: Optional[str] = None   # "01", "01-12" for batches
+    anime_season: Optional[str] = None     # "01", "02"
+    video_resolution: Optional[str] = None
+    release_group: Optional[str] = None
+    video_codec: Optional[str] = None
+    source: Optional[str] = None
+    audio_codec: Optional[str] = None
+
+
 class TorrentResult(BaseModel):
     title: str
     magnet_link: Optional[str] = None
@@ -20,6 +30,7 @@ class TorrentResult(BaseModel):
     category: str = ""
     uploaded_at: Optional[datetime] = None
     source_indexer: str
+    parsed: Optional[ParsedInfo] = None
 
 
 class IndexerError(BaseModel):
@@ -40,12 +51,10 @@ class QueryParams(BaseModel):
 class SearchResponse(BaseModel):
     query: QueryParams
     resolved_titles: list[TitleEntry] = []
-    queries_executed: list[str] = []
     results: list[TorrentResult] = []
     total_results: int = 0
     from_cache: bool = False
     errors: list[IndexerError] = []
-    warnings: list[str] = []
     partial: bool = False
 
 
