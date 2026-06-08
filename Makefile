@@ -10,3 +10,8 @@ up:
 
 down:
 	docker compose down
+
+release:
+	scripts/release.sh
+
+.PHONY: dev up down release
