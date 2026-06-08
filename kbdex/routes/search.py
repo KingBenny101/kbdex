@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from kbdex.exceptions import APIError
-from kbdex.indexers.registry import list_indexers
+from kbdex.indexers import list_indexers
 from kbdex.models import ErrorResponse, QueryParams, SearchResponse
 from kbdex.search import run_search
 
