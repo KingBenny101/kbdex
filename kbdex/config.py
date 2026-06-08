@@ -1,9 +1,13 @@
+import logging
+import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-DATA_DIR = Path("data")
+DATA_DIR = Path(os.environ.get("KBDEX_DATA_DIR", "data"))
+
+logger = logging.getLogger(__name__)
 
 
 class AppSettings(BaseModel):
@@ -42,6 +46,7 @@ def _load_config() -> AppSettings:
         data = {child.tag: child.text for child in root if child.text is not None}
         return AppSettings(**data)
     except Exception:
+        logger.exception("Failed to parse app.xml, falling back to defaults")
         return defaults
 
 
@@ -50,6 +55,10 @@ def reload_settings() -> None:
     new = _load_config()
     for field in settings.model_fields:
         setattr(settings, field, getattr(new, field))
+    # Deferred import avoids a circular dependency at module level.
+    from kbdex import cache as _cache  # noqa: PLC0415
+    _cache.search_cache._default_ttl = settings.search_cache_ttl_seconds
+    _cache.disk_search_cache._ttl = settings.search_cache_ttl_seconds
 
 
 def save_app_settings(**kwargs) -> None:
