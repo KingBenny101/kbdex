@@ -1,11 +1,10 @@
 import logging
-import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-DATA_DIR = Path(os.environ.get("KBDEX_DATA_DIR", "data"))
+DATA_DIR = Path("data")
 
 logger = logging.getLogger(__name__)
 
