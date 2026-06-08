@@ -1,36 +1,6 @@
 # kbdex
 
-A self-hosted API that finds anime torrents by AniDB ID.
-
-**API docs:** https://kingbenny101.github.io/kbdex/
-
----
-
-## How it works
-
-Search by any anime database ID — AniDB, MAL, AniList, Kitsu, TVDB, and more. kbdex resolves it to an AniDB ID, looks up all known title variants, searches the configured indexers, and parses each torrent filename to filter and rank results by season and episode.
-
-```
-MAL ID / AniList ID / ...
-        │
-        ▼
- anime-lists mapping  ──►  AniDB ID  ──►  resolve titles  ──►  search indexers
-                                                                      │
-                                                                      ▼
-                                                              parse filenames (anitopy + guessit)
-                                                                      │
-                                                                      ▼
-                                                              filter by season / episode
-                                                                      │
-                                                                      ▼
-                                                                JSON results
-```
-
-**At startup**, kbdex downloads two data files into the configured data directory and refreshes them weekly:
-- **AniDB titles dump** — maps AniDB IDs to all known title variants (romanised, Japanese, English, synonyms)
-- **anime-lists** ([Fribb/anime-lists](https://github.com/Fribb/anime-lists)) — maps MAL, AniList, Kitsu, TVDB, AniSearch, ANN, LiveChart, and Simkl IDs to AniDB IDs
-
-**At search time**, the resolved titles are sent to each indexer. Every torrent filename is parsed with [anitopy](https://github.com/igorcmoura/anitopy) (with [guessit](https://github.com/guessit-io/guessit) as a fallback) to extract episode number, season, resolution, codec, and release group. Results are filtered to match the requested season/episode and sorted so exact episode matches rank above batch releases.
+A self-hosted app for searching anime torrents by title or any major database ID.
 
 ---
 
@@ -56,7 +26,42 @@ cd kbdex
 docker compose up -d
 ```
 
-The API will be available at `http://localhost:8000`.
+The app will be available at `http://localhost:8000`. API docs are at `/docs`.
+
+---
+
+## How it works
+
+Search by title or any anime database ID — AniDB, MAL, AniList, Kitsu, TVDB, and more. kbdex resolves it to an AniDB ID, looks up all known title variants, searches the configured indexers, and parses each torrent filename to filter and rank results by season and episode.
+
+```
+MAL ID / AniList ID / ...          free-text query
+        │                                 │
+        ▼                                 │
+ anime-lists mapping                      │
+        │                                 │
+        ▼                                 │
+    AniDB ID  ──►  resolve titles         │
+                        │                 │
+                        └────────┬────────┘
+                                 ▼
+                          search indexers
+                                 │
+                                 ▼
+                     parse filenames (anitopy + guessit)
+                                 │
+                                 ▼
+                       filter by season / episode
+                                 │
+                                 ▼
+                           JSON results
+```
+
+**At startup**, kbdex downloads two data files and refreshes them weekly:
+- **AniDB titles dump** — maps AniDB IDs to all known title variants (romanised, Japanese, English, synonyms)
+- **anime-lists** ([Fribb/anime-lists](https://github.com/Fribb/anime-lists)) — maps MAL, AniList, Kitsu, TVDB, AniSearch, ANN, LiveChart, and Simkl IDs to AniDB IDs
+
+**At search time**, the resolved titles are sent to each indexer. Every torrent filename is parsed with [anitopy](https://github.com/igorcmoura/anitopy) (with [guessit](https://github.com/guessit-io/guessit) as a fallback) to extract episode number, season, resolution, codec, and release group. Results are filtered to match the requested season/episode and sorted so exact episode matches rank above batch releases.
 
 ---
 
