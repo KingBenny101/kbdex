@@ -1,0 +1,84 @@
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel
+
+
+class TitleEntry(BaseModel):
+    type: str       # "main", "official", "short", "synonym"
+    language: str   # "en", "ja", "x-jat", etc.
+    value: str
+
+
+class TorrentResult(BaseModel):
+    title: str
+    magnet_link: Optional[str] = None
+    torrent_url: Optional[str] = None
+    size_bytes: int = 0
+    size_human: str = ""
+    seeders: int = 0
+    leechers: int = 0
+    category: str = ""
+    uploaded_at: Optional[datetime] = None
+    source_indexer: str
+
+
+class IndexerError(BaseModel):
+    indexer: str
+    code: str
+    message: str
+    retryable: bool = True
+
+
+class QueryParams(BaseModel):
+    anidb_id: Optional[int] = None
+    q: Optional[str] = None
+    season: Optional[int] = None
+    episode: Optional[int] = None
+    indexers: list[str] = []
+
+
+class SearchResponse(BaseModel):
+    query: QueryParams
+    resolved_titles: list[TitleEntry] = []
+    queries_executed: list[str] = []
+    results: list[TorrentResult] = []
+    total_results: int = 0
+    from_cache: bool = False
+    errors: list[IndexerError] = []
+    warnings: list[str] = []
+    partial: bool = False
+
+
+class TitleResponse(BaseModel):
+    anidb_id: int
+    titles: list[TitleEntry]
+    source: str = "dump"
+    dump_last_refreshed: Optional[datetime] = None
+    from_cache: bool = False
+
+
+class IndexerHealth(BaseModel):
+    status: str  # "ok", "degraded", "down"
+    last_checked: Optional[datetime] = None
+
+
+class DumpHealth(BaseModel):
+    status: str
+    last_refreshed: Optional[datetime] = None
+    entry_count: int = 0
+
+
+class HealthResponse(BaseModel):
+    status: str  # "ok", "degraded"
+    indexers: dict[str, IndexerHealth] = {}
+    anidb_dump: DumpHealth
+
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+    param: Optional[str] = None
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorDetail
