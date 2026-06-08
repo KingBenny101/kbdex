@@ -63,7 +63,9 @@ class DiskSearchCache:
         if not entry:
             return None
         try:
-            expires_at = datetime.fromisoformat(entry["expires_at"]).replace(tzinfo=timezone.utc)
+            expires_at = datetime.fromisoformat(entry["expires_at"])
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
         except (KeyError, ValueError):
             return None
         if datetime.now(timezone.utc) > expires_at:
@@ -76,8 +78,8 @@ class DiskSearchCache:
         data = self._read(anidb_id)
         data["anidb_id"] = anidb_id
         data[indexer] = {
-            "cached_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
-            "expires_at": expires_at.strftime("%Y-%m-%dT%H:%M:%S"),
+            "cached_at": now.isoformat(timespec="seconds"),
+            "expires_at": expires_at.isoformat(timespec="seconds"),
             "results": results,
         }
         self._write(anidb_id, data)
