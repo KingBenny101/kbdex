@@ -4,6 +4,7 @@ import re
 from typing import Optional
 
 import anitopy
+import guessit
 import httpx
 
 from kbdex.anidb.dump import resolve_titles
@@ -80,20 +81,64 @@ def _extract_title_queries(titles: list[TitleEntry]) -> list[str]:
     return queries
 
 
-def _parse_torrent_info(title: str) -> ParsedInfo:
+def _try_anitopy(title: str) -> ParsedInfo:
     try:
-        parsed = anitopy.parse(title)
+        p = anitopy.parse(title)
         return ParsedInfo(
-            episode_number=parsed.get("episode_number"),
-            anime_season=parsed.get("anime_season"),
-            video_resolution=parsed.get("video_resolution"),
-            release_group=parsed.get("release_group"),
-            video_codec=parsed.get("video_codec"),
-            source=parsed.get("source"),
-            audio_codec=parsed.get("audio_codec"),
+            episode_number=p.get("episode_number"),
+            anime_season=p.get("anime_season"),
+            video_resolution=p.get("video_resolution"),
+            release_group=p.get("release_group"),
+            video_codec=p.get("video_codec"),
+            source=p.get("source"),
+            audio_codec=p.get("audio_codec"),
         )
     except Exception:
         return ParsedInfo()
+
+
+def _try_guessit(title: str) -> ParsedInfo:
+    try:
+        g = guessit.guessit(title)
+
+        ep = g.get("episode")
+        if isinstance(ep, list):
+            episode_number = f"{min(ep):02d}-{max(ep):02d}"
+        elif isinstance(ep, int):
+            episode_number = f"{ep:02d}"
+        else:
+            episode_number = None
+
+        season = g.get("season")
+        anime_season = f"{int(season):02d}" if season is not None else None
+
+        return ParsedInfo(
+            episode_number=episode_number,
+            anime_season=anime_season,
+            video_resolution=g.get("screen_size"),
+            release_group=g.get("release_group"),
+            video_codec=g.get("video_codec"),
+            source=str(g.get("source")) if g.get("source") else None,
+            audio_codec=g.get("audio_codec"),
+        )
+    except Exception:
+        return ParsedInfo()
+
+
+def _parse_torrent_info(title: str) -> ParsedInfo:
+    a = _try_anitopy(title)
+    if a.episode_number is not None:
+        return a
+    g = _try_guessit(title)
+    return ParsedInfo(
+        episode_number=a.episode_number or g.episode_number,
+        anime_season=a.anime_season or g.anime_season,
+        video_resolution=a.video_resolution or g.video_resolution,
+        release_group=a.release_group or g.release_group,
+        video_codec=a.video_codec or g.video_codec,
+        source=a.source or g.source,
+        audio_codec=a.audio_codec or g.audio_codec,
+    )
 
 
 def _matches_episode(
