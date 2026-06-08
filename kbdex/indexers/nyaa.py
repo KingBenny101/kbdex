@@ -25,9 +25,9 @@ from urllib.parse import quote
 
 import httpx
 from bs4 import BeautifulSoup, Tag
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from kbdex.config import settings
-from kbdex.indexers.throttle import CircuitBreaker, RateLimiter
+from kbdex.indexers.base import CircuitBreaker, RateLimiter
 from kbdex.models import IndexerHealth, TorrentResult
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,19 @@ _MAGNET_HREF = re.compile(r"^magnet:")
 _RESULTS_PER_PAGE = 75
 
 
+class NyaaSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="KBDEX_NYAA_", env_file=".env")
+
+    base_url: str = "https://nyaa.si"
+    min_request_interval_ms: int = 2000
+    max_retries: int = 3
+    backoff_base_ms: int = 1000
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_cooldown_seconds: int = 60
+    request_timeout_seconds: float = 10.0
+    max_pages: int = 3
+
+
 def _parse_size(size_str: str) -> int:
     m = _SIZE_RE.match(size_str.strip())
     if not m:
@@ -57,7 +70,7 @@ def _parse_size(size_str: str) -> int:
         return 0
 
 
-def _parse_row(row: Tag) -> dict | None:
+def _parse_row(row: Tag, base_url: str) -> dict | None:
     cells = row.find_all("td")
     if len(cells) < 7:
         return None
@@ -72,7 +85,7 @@ def _parse_row(row: Tag) -> dict | None:
 
     # .torrent download URL
     dl_tag = row.find("a", href=_DL_HREF)
-    torrent_url = ("https://nyaa.si" + dl_tag["href"]) if dl_tag else None
+    torrent_url = (base_url + dl_tag["href"]) if dl_tag else None
 
     # Magnet link (already fully formed in the HTML)
     mag_tag = row.find("a", href=_MAGNET_HREF)
@@ -118,7 +131,7 @@ def _parse_row(row: Tag) -> dict | None:
     }
 
 
-def _parse_html(content: bytes) -> list[dict]:
+def _parse_html(content: bytes, base_url: str) -> list[dict]:
     soup = BeautifulSoup(content, "html.parser")
     table = soup.find("table", class_="torrent-list")
     if not table:
@@ -128,7 +141,7 @@ def _parse_html(content: bytes) -> list[dict]:
         return []
     results = []
     for row in tbody.find_all("tr"):
-        item = _parse_row(row)
+        item = _parse_row(row, base_url)
         if item:
             results.append(item)
     return results
@@ -137,31 +150,32 @@ def _parse_html(content: bytes) -> list[dict]:
 class NyaaAdapter:
     name = "nyaa"
     display_name = "Nyaa.si"
-    base_url = settings.nyaa_base_url
     supports_category_filter = True
     supports_magnet = True
     supports_torrent_url = True
-    min_request_interval_ms = settings.nyaa_min_request_interval_ms
-    max_retries = settings.nyaa_max_retries
-    backoff_base_ms = settings.nyaa_backoff_base_ms
 
-    def __init__(self) -> None:
-        self._rate_limiter = RateLimiter(self.min_request_interval_ms)
+    def __init__(self, cfg: NyaaSettings | None = None) -> None:
+        self._cfg = cfg or NyaaSettings()
+        self.base_url = self._cfg.base_url
+        self.min_request_interval_ms = self._cfg.min_request_interval_ms
+        self.max_retries = self._cfg.max_retries
+        self.backoff_base_ms = self._cfg.backoff_base_ms
+        self._rate_limiter = RateLimiter(self._cfg.min_request_interval_ms)
         self._circuit_breaker = CircuitBreaker(
-            threshold=settings.nyaa_circuit_breaker_threshold,
-            cooldown_seconds=settings.nyaa_circuit_breaker_cooldown_seconds,
+            threshold=self._cfg.circuit_breaker_threshold,
+            cooldown_seconds=self._cfg.circuit_breaker_cooldown_seconds,
         )
 
     async def search(
         self, query: str, options: dict[str, Any] | None = None
     ) -> list[dict]:
         if self._circuit_breaker.is_open:
-            raise RuntimeError("nyaa circuit breaker is open")
+            raise RuntimeError(f"{self.name} circuit breaker is open")
 
         opts = options or {}
-        category = opts.get("category", "1_0")   # default: anime
+        category = opts.get("category", "1_0")
         filter_flag = opts.get("filter", "0")
-        max_pages = int(opts.get("max_pages", settings.nyaa_max_pages))
+        max_pages = int(opts.get("max_pages", self._cfg.max_pages))
 
         all_items: list[dict] = []
         for page in range(1, max_pages + 1):
@@ -170,11 +184,11 @@ class NyaaAdapter:
                 f"&q={quote(query)}&p={page}"
             )
             content = await self._fetch_with_retry(url)
-            items = _parse_html(content)
+            items = _parse_html(content, self.base_url)
             all_items.extend(items)
 
             if len(items) < _RESULTS_PER_PAGE:
-                break   # last page reached — no point fetching further
+                break
 
         return all_items
 
@@ -209,7 +223,7 @@ class NyaaAdapter:
         start = _time.monotonic()
         try:
             async with httpx.AsyncClient(
-                timeout=settings.nyaa_request_timeout_seconds
+                timeout=self._cfg.request_timeout_seconds
             ) as client:
                 resp = await client.head(self.base_url)
                 resp.raise_for_status()
@@ -228,7 +242,7 @@ class NyaaAdapter:
             try:
                 await self._rate_limiter.acquire()
                 async with httpx.AsyncClient(
-                    timeout=settings.nyaa_request_timeout_seconds,
+                    timeout=self._cfg.request_timeout_seconds,
                     follow_redirects=True,
                     headers={"User-Agent": "kbdex/0.1 (personal anime torrent search)"},
                 ) as client:
@@ -240,7 +254,8 @@ class NyaaAdapter:
                 last_exc = exc
                 self._circuit_breaker.record_failure()
                 logger.warning(
-                    "Nyaa request failed (attempt %d/%d): %s",
+                    "%s request failed (attempt %d/%d): %s",
+                    self.name,
                     attempt + 1,
                     self.max_retries + 1,
                     exc,
