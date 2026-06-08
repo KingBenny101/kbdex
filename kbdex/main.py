@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from kbdex.anidb.dump import dump
@@ -14,30 +14,6 @@ from kbdex.routes import health, search, titles, ui
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
-
-_DISCLAIMER = (
-    "This service provides metadata only. "
-    "No copyrighted content is hosted or distributed. "
-    "Use at your own risk."
-)
-
-_TERMS = """\
-kbdex — Anime Torrent Search API
-=================================
-
-Terms of Use
-------------
-- This service is for personal, non-commercial informational use only.
-- The operator does not host, distribute, or endorse any copyrighted content.
-- Only torrent metadata (titles, sizes, magnet links) is returned; no files are proxied.
-- Users are responsible for complying with the laws of their jurisdiction.
-- Automated bulk scraping or circumvention of rate limiting is prohibited.
-
-Disclaimer
-----------
-This API returns metadata sourced from public torrent indexers.
-The operator makes no warranty regarding the accuracy or legality of results.
-"""
 
 
 async def _periodic_dump_refresh() -> None:
@@ -83,25 +59,17 @@ app = FastAPI(
 )
 
 
-@app.middleware("http")
-async def disclaimer_header(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Disclaimer"] = _DISCLAIMER
-    return response
-
-
 @app.exception_handler(APIError)
 async def api_error_handler(request: Request, exc: APIError):
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": exc.code, "message": exc.message, "param": exc.param}},
-        headers={"X-Disclaimer": _DISCLAIMER},
     )
 
 
-@app.get("/", response_class=PlainTextResponse, include_in_schema=False)
-async def terms():
-    return _TERMS
+@app.get("/", response_class=RedirectResponse, include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/ui/search")
 
 
 app.mount("/static", StaticFiles(directory="kbdex/static"), name="static")

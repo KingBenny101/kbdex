@@ -67,3 +67,9 @@ All settings are stored as XML files under the data volume and can be edited dir
 | `data/config/sukebei.xml` | Same as above for Sukebei |
 
 Config files are created with defaults on first start. There are no environment variables.
+
+---
+
+## Disclaimer
+
+This tool returns metadata from public torrent indexers. No content is hosted or proxied. Use responsibly and in accordance with the laws of your jurisdiction.

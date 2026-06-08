@@ -32,8 +32,8 @@ async def ui_root():
 @router.get("/search", response_class=HTMLResponse, include_in_schema=False)
 async def search_page(request: Request):
     return templates.TemplateResponse(
-        "search.html",
-        {"request": request, "active": "search", "indexers": list_indexers()},
+        request, "search.html",
+        {"active": "search", "indexers": list_indexers()},
     )
 
 
@@ -89,20 +89,19 @@ async def search_post(
         response = await run_search(params)
     except APIError as exc:
         return templates.TemplateResponse(
-            "_results.html",
-            {"request": request, "error": exc.message, "results": [], "from_cache": False, "partial": False},
+            request, "_results.html",
+            {"error": exc.message, "results": [], "from_cache": False, "partial": False},
         )
     except Exception as exc:
         logger.exception("Unexpected error during UI search")
         return templates.TemplateResponse(
-            "_results.html",
-            {"request": request, "error": str(exc), "results": [], "from_cache": False, "partial": False},
+            request, "_results.html",
+            {"error": str(exc), "results": [], "from_cache": False, "partial": False},
         )
 
     return templates.TemplateResponse(
-        "_results.html",
+        request, "_results.html",
         {
-            "request": request,
             "error": None,
             "results": response.results,
             "from_cache": response.from_cache,
@@ -116,9 +115,8 @@ async def settings_page(request: Request):
     nyaa = get_indexer("nyaa")
     sukebei = get_indexer("sukebei")
     return templates.TemplateResponse(
-        "settings.html",
+        request, "settings.html",
         {
-            "request": request,
             "active": "settings",
             "nyaa": {"base_url": nyaa._cfg.base_url, "max_pages": nyaa._cfg.max_pages},
             "sukebei": {"base_url": sukebei._cfg.base_url, "max_pages": sukebei._cfg.max_pages},
