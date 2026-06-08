@@ -3,11 +3,12 @@ import logging
 import re
 from typing import Optional
 
-from kbdex.anidb.dump import dump
-from kbdex.cache import make_search_cache_key, search_cache, title_cache
+import httpx
+
+from kbdex.anidb.dump import resolve_titles
+from kbdex.cache import make_search_cache_key, search_cache
 from kbdex.config import settings
-from kbdex.exceptions import AniDBIDNotFoundError, DumpNotReadyError
-from kbdex.indexers.registry import get_indexer
+from kbdex.indexers import get_indexer
 from kbdex.models import (
     IndexerError,
     QueryParams,
@@ -50,10 +51,7 @@ def build_queries(
     episode: Optional[int],
 ) -> list[str]:
     """Construct prioritised, deduplicated search query strings."""
-    if q and not titles:
-        return [q]
-    if q and titles:
-        # Case E: free-text takes priority
+    if q:
         return [q]
 
     xjat = next(
@@ -69,10 +67,9 @@ def build_queries(
         (t.value for t in titles if t.type == "official" and t.language == "en"), None
     )
     # Deduplicate while preserving priority order: romanised → japanese → english
-    _raw = [xjat, ja, en_official]
     seen_titles: set[str] = set()
     candidates: list[str] = []
-    for v in _raw:
+    for v in [xjat, ja, en_official]:
         if v and v not in seen_titles:
             seen_titles.add(v)
             candidates.append(v)
@@ -88,7 +85,7 @@ def build_queries(
         ep = f"{episode:02d}"
         seas = f"{season:02d}"
         for title in candidates:
-            queries.append(f"{title} - {ep}")          # most common fansub pattern
+            queries.append(f"{title} - {ep}")
             queries.append(f"{title} S{seas}E{ep}")
         if candidates:
             queries.append(f"{candidates[0]} {ep}")
@@ -100,7 +97,6 @@ def build_queries(
         for title in candidates:
             queries.append(title)
 
-    # Deduplicate preserving order
     seen: set[str] = set()
     deduped: list[str] = []
     for query in queries:
@@ -110,24 +106,6 @@ def build_queries(
             deduped.append(query)
 
     return deduped
-
-
-def _resolve_titles(anidb_id: int) -> tuple[list[TitleEntry], bool]:
-    """Return (titles, from_cache). Raises if not found."""
-    cache_key = f"title:{anidb_id}"
-    cached = title_cache.get(cache_key)
-    if cached is not None:
-        return cached, True
-
-    if not dump.is_loaded:
-        raise DumpNotReadyError()
-
-    titles = dump.get_titles(anidb_id)
-    if titles is None:
-        raise AniDBIDNotFoundError(anidb_id)
-
-    title_cache.set(cache_key, titles, settings.title_cache_ttl_seconds)
-    return titles, False
 
 
 async def _search_one(
@@ -158,7 +136,6 @@ async def _search_one(
         search_cache.set(cache_key, results, settings.search_cache_ttl_seconds)
         return results, False, None
     except RuntimeError as exc:
-        # Circuit breaker open
         return [], False, IndexerError(
             indexer=indexer_name,
             code="CIRCUIT_OPEN",
@@ -166,7 +143,7 @@ async def _search_one(
             retryable=False,
         )
     except Exception as exc:
-        code = "TIMEOUT" if "timeout" in str(exc).lower() else "HTTP_ERROR"
+        code = "TIMEOUT" if isinstance(exc, httpx.TimeoutException) else "HTTP_ERROR"
         return [], False, IndexerError(
             indexer=indexer_name,
             code=code,
@@ -181,7 +158,7 @@ async def run_search(params: QueryParams) -> SearchResponse:
     # Step 1 – Resolve AniDB titles
     resolved_titles: list[TitleEntry] = []
     if params.anidb_id is not None:
-        resolved_titles, _ = _resolve_titles(params.anidb_id)
+        resolved_titles, _ = resolve_titles(params.anidb_id)
 
     # Step 2 – Build queries
     queries = build_queries(resolved_titles, params.q, params.season, params.episode)
@@ -207,7 +184,6 @@ async def run_search(params: QueryParams) -> SearchResponse:
 
     for outcome in outcomes:
         if isinstance(outcome, Exception):
-            # Unexpected error in the gather itself
             logger.exception("Unexpected error during search gather: %s", outcome)
             continue
         results, from_cache, error = outcome
@@ -223,7 +199,6 @@ async def run_search(params: QueryParams) -> SearchResponse:
 
     errors = list(errors_by_indexer.values())
     partial = bool(errors) and bool(all_results)
-    all_failed = bool(errors) and not all_results
 
     return SearchResponse(
         query=params,

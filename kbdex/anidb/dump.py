@@ -8,7 +8,9 @@ from typing import Optional
 
 import httpx
 
+from kbdex.cache import title_cache
 from kbdex.config import settings
+from kbdex.exceptions import AniDBIDNotFoundError, DumpNotReadyError
 from kbdex.models import TitleEntry
 
 logger = logging.getLogger(__name__)
@@ -99,3 +101,21 @@ class AniDBDump:
 
 
 dump = AniDBDump()
+
+
+def resolve_titles(anidb_id: int) -> tuple[list[TitleEntry], bool]:
+    """Return (titles, from_cache). Raises AniDBIDNotFoundError or DumpNotReadyError."""
+    cache_key = f"title:{anidb_id}"
+    cached = title_cache.get(cache_key)
+    if cached is not None:
+        return cached, True
+
+    if not dump.is_loaded:
+        raise DumpNotReadyError()
+
+    titles = dump.get_titles(anidb_id)
+    if titles is None:
+        raise AniDBIDNotFoundError(anidb_id)
+
+    title_cache.set(cache_key, titles, settings.title_cache_ttl_seconds)
+    return titles, False
