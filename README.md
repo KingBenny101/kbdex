@@ -15,6 +15,7 @@ docker run -d \
   --name kbdex \
   -p 8000:8000 \
   -v kbdex-data:/app/data \
+  --restart unless-stopped \
   ghcr.io/kingbenny101/kbdex:latest
 ```
 
