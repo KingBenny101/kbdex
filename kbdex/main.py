@@ -4,12 +4,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 from kbdex.anidb.dump import dump
 from kbdex.animelists import mapper
 from kbdex.config import settings
 from kbdex.exceptions import APIError
-from kbdex.routes import health, search, titles
+from kbdex.routes import health, search, titles, ui
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -103,8 +104,11 @@ async def terms():
     return _TERMS
 
 
+app.mount("/static", StaticFiles(directory="kbdex/static"), name="static")
+
 app.include_router(search.router)
 app.include_router(titles.router)
 app.include_router(health.router)
+app.include_router(ui.router, prefix="/ui")
 
 

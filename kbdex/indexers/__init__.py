@@ -19,3 +19,10 @@ def get_indexer(name: str) -> IndexerAdapter | None:
 
 def list_indexers() -> list[str]:
     return list(_registry.keys())
+
+
+def reload_indexers() -> None:
+    """Rebuild adapter instances, picking up any changes to data/ui_settings.json."""
+    global INDEXERS, _registry
+    INDEXERS = [NyaaAdapter(), SukebeiAdapter()]
+    _registry = {i.name: i for i in INDEXERS}

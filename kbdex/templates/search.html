@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Search — kbdex{% endblock %}
+{% block content %}
+<h2>Search</h2>
+
+<form
+  hx-post="/ui/search"
+  hx-target="#results"
+  hx-swap="innerHTML"
+  hx-indicator="#search-spinner"
+>
+  <div class="search-form">
+    <!-- ID lookup -->
+    <div>
+      <label for="id-value">Anime ID</label>
+      <div class="id-row">
+        <select name="id_type" id="id-type">
+          <option value="anidb_id">AniDB</option>
+          <option value="mal_id">MyAnimeList</option>
+          <option value="anilist_id">AniList</option>
+          <option value="kitsu_id">Kitsu</option>
+          <option value="tvdb_id">TVDB</option>
+          <option value="anisearch_id">AniSearch</option>
+          <option value="animenewsnetwork_id">ANN</option>
+          <option value="livechart_id">LiveChart</option>
+          <option value="simkl_id">Simkl</option>
+        </select>
+        <input type="number" name="id_value" id="id-value" min="1" placeholder="e.g. 1">
+      </div>
+    </div>
+
+    <!-- Free text -->
+    <div>
+      <label for="q">Or free-text search</label>
+      <input type="text" name="q" id="q" placeholder="e.g. Attack on Titan">
+    </div>
+
+    <!-- Season / Episode -->
+    <div>
+      <label>Season / Episode</label>
+      <div class="filters">
+        <div>
+          <label for="season" style="font-size:0.8rem;margin-bottom:0.2rem;">Season</label>
+          <input type="number" name="season" id="season" min="1" placeholder="—">
+        </div>
+        <div>
+          <label for="episode" style="font-size:0.8rem;margin-bottom:0.2rem;">Episode</label>
+          <input type="number" name="episode" id="episode" min="1" placeholder="—">
+        </div>
+      </div>
+    </div>
+
+    <!-- Indexers -->
+    <div>
+      <label>Indexers</label>
+      <div class="indexer-checks">
+        {% for name in indexers %}
+        <label>
+          <input type="checkbox" name="indexers" value="{{ name }}" checked>
+          {{ name }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="full-row">
+      <button type="submit">
+        Search
+        <span id="search-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+    </div>
+  </div>
+</form>
+
+<div id="results"></div>
+{% endblock %}

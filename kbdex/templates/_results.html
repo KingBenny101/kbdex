@@ -1,0 +1,53 @@
+{% if error %}
+<div class="error-box">{{ error }}</div>
+{% elif not results %}
+<p>No results found.</p>
+{% else %}
+{% if from_cache %}<p class="cache-hit">Cached results</p>{% endif %}
+<p>{{ results | length }} result{{ 's' if results | length != 1 else '' }}{% if partial %} — some indexers failed{% endif %}</p>
+<table class="results-table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Ep</th>
+      <th>Seeders</th>
+      <th>Size</th>
+      <th>Source</th>
+      <th>Links</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in results %}
+    <tr>
+      <td class="title-cell">
+        {{ r.title }}
+        {% if r.parsed %}
+          {% if r.parsed.video_resolution %}<span class="badge res">{{ r.parsed.video_resolution }}</span>{% endif %}
+          {% if r.parsed.release_group %}<span class="badge grp">{{ r.parsed.release_group }}</span>{% endif %}
+        {% endif %}
+      </td>
+      <td>
+        {% if r.parsed %}
+          {% if r.parsed.anime_season and r.parsed.episode_number %}
+            <span class="badge ep">S{{ r.parsed.anime_season }}E{{ r.parsed.episode_number }}</span>
+          {% elif r.parsed.episode_number %}
+            <span class="badge ep">E{{ r.parsed.episode_number }}</span>
+          {% elif r.parsed.anime_season %}
+            <span class="badge ep">S{{ r.parsed.anime_season }}</span>
+          {% else %}
+            <span class="badge">batch</span>
+          {% endif %}
+        {% endif %}
+      </td>
+      <td><span class="seeders">{{ r.seeders }}</span></td>
+      <td>{{ r.size_human }}</td>
+      <td>{{ r.source_indexer }}</td>
+      <td class="actions">
+        {% if r.magnet_link %}<a href="{{ r.magnet_link }}">Magnet</a>{% endif %}
+        {% if r.torrent_url %}<a href="{{ r.torrent_url }}" target="_blank" rel="noopener">.torrent</a>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
