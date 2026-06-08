@@ -43,11 +43,10 @@ def _deduplicate(results: list[TorrentResult]) -> list[TorrentResult]:
     seen: set[str] = set()
     out: list[TorrentResult] = []
     for r in results:
-        key = (
-            _extract_info_hash(r.magnet_link)
-            if r.magnet_link
-            else r.title.lower()
-        )
+        if r.magnet_link:
+            key = _extract_info_hash(r.magnet_link) or r.title.lower()
+        else:
+            key = r.title.lower()
         if key and key not in seen:
             seen.add(key)
             out.append(r)
@@ -256,6 +255,7 @@ async def run_search(params: QueryParams) -> SearchResponse:
     # Step 4 – Aggregate
     all_dicts: list[dict] = []
     errors_by_indexer: dict[str, IndexerError] = {}
+    successful_tasks = 0
     all_from_cache = True
 
     for outcome in outcomes:
@@ -266,9 +266,13 @@ async def run_search(params: QueryParams) -> SearchResponse:
         if error:
             errors_by_indexer[error.indexer] = error
         else:
+            successful_tasks += 1
             all_dicts.extend(result_dicts)
             if not from_cache:
                 all_from_cache = False
+
+    if successful_tasks == 0:
+        all_from_cache = False
 
     # Step 5 – Reconstruct TorrentResult objects and attach parsed info
     all_results: list[TorrentResult] = []
