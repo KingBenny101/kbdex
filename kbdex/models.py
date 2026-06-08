@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel
 
 
@@ -61,6 +61,7 @@ class SearchResponse(BaseModel):
 class TitleResponse(BaseModel):
     anidb_id: int
     titles: list[TitleEntry]
+    mapped_ids: dict[str, Any] = {}
     source: str = "dump"
     dump_last_refreshed: Optional[datetime] = None
     from_cache: bool = False
@@ -77,10 +78,17 @@ class DumpHealth(BaseModel):
     entry_count: int = 0
 
 
+class AnimeListsHealth(BaseModel):
+    status: str
+    last_refreshed: Optional[datetime] = None
+    entry_count: int = 0
+
+
 class HealthResponse(BaseModel):
     status: str  # "ok", "degraded"
     indexers: dict[str, IndexerHealth] = {}
     anidb_dump: DumpHealth
+    animelists: AnimeListsHealth
 
 
 class ErrorDetail(BaseModel):

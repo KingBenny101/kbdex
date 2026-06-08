@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
+from kbdex.animelists import mapper
 from kbdex.exceptions import APIError
 from kbdex.indexers import list_indexers
 from kbdex.models import ErrorResponse, QueryParams, SearchResponse
@@ -16,22 +17,31 @@ router = APIRouter()
     response_model=SearchResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Missing or invalid parameter"},
-        404: {"model": ErrorResponse, "description": "AniDB ID not found"},
+        404: {"model": ErrorResponse, "description": "AniDB ID or foreign ID mapping not found"},
         422: {"model": ErrorResponse, "description": "Invalid parameter combination"},
         502: {"model": SearchResponse, "description": "All indexers failed"},
         206: {"model": SearchResponse, "description": "Partial results — some indexers failed"},
     },
     summary="Search for anime torrents",
     description=(
-        "Resolves an AniDB ID to title variants, searches indexers with the show title, "
-        "parses torrent filenames with anitopy, and filters results by season/episode."
+        "Resolves an AniDB ID (or a foreign ID such as MAL/AniList/Kitsu/TVDB) to title variants, "
+        "searches indexers with the show title, parses torrent filenames with anitopy, "
+        "and filters results by season/episode."
     ),
 )
 async def search(
     anidb_id: Optional[int] = Query(None, description="AniDB series ID"),
+    mal_id: Optional[int] = Query(None, description="MyAnimeList series ID"),
+    anilist_id: Optional[int] = Query(None, description="AniList series ID"),
+    kitsu_id: Optional[int] = Query(None, description="Kitsu series ID"),
+    tvdb_id: Optional[int] = Query(None, description="TheTVDB series ID"),
+    anisearch_id: Optional[int] = Query(None, description="AniSearch series ID"),
+    animenewsnetwork_id: Optional[int] = Query(None, description="Anime News Network series ID"),
+    livechart_id: Optional[int] = Query(None, description="LiveChart series ID"),
+    simkl_id: Optional[int] = Query(None, description="Simkl series ID"),
     q: Optional[str] = Query(None, description="Free-text search query"),
-    season: Optional[int] = Query(None, description="Season number (with anidb_id only)"),
-    episode: Optional[int] = Query(None, description="Episode number (with anidb_id + season only)"),
+    season: Optional[int] = Query(None, description="Season number (with an ID param only)"),
+    episode: Optional[int] = Query(None, description="Episode number (with an ID param + season only)"),
     indexers: list[str] = Query(default=None, description="Indexers to query (default: all)"),
 ):
     # Support comma-separated values: ?indexers=nyaa,sukebei
@@ -39,18 +49,44 @@ async def search(
     if not indexers:
         indexers = list_indexers()
 
+    # Collect provided foreign IDs
+    foreign = {k: v for k, v in {
+        "mal_id": mal_id,
+        "anilist_id": anilist_id,
+        "kitsu_id": kitsu_id,
+        "tvdb_id": tvdb_id,
+        "anisearch_id": anisearch_id,
+        "animenewsnetwork_id": animenewsnetwork_id,
+        "livechart_id": livechart_id,
+        "simkl_id": simkl_id,
+    }.items() if v is not None}
+
+    # Validate: at most one ID source at a time
+    id_sources = ([anidb_id] if anidb_id is not None else []) + list(foreign.values())
+    if len(id_sources) > 1:
+        raise APIError(
+            422,
+            "AMBIGUOUS_ID",
+            "Provide exactly one ID parameter (anidb_id, mal_id, anilist_id, ...).",
+        )
+
+    # Resolve foreign ID → anidb_id
+    if foreign:
+        id_type, id_value = next(iter(foreign.items()))
+        anidb_id = mapper.resolve(id_type, id_value)
+
     # Validation
     if anidb_id is None and q is None:
         raise APIError(
             400,
             "MISSING_REQUIRED_PARAM",
-            "At least one of 'anidb_id' or 'q' must be provided.",
+            "At least one of 'anidb_id', a foreign ID param (mal_id, anilist_id, ...), or 'q' must be provided.",
         )
     if season is not None and anidb_id is None:
         raise APIError(
             422,
             "INVALID_PARAM_COMBO",
-            "'season' is only meaningful when 'anidb_id' is also provided.",
+            "'season' is only meaningful when an ID param is also provided.",
             param="season",
         )
     if episode is not None and season is None:
