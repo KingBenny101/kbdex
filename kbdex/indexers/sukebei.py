@@ -1,11 +1,7 @@
-from pydantic_settings import SettingsConfigDict
-
-from kbdex.indexers.nyaa import NyaaAdapter, NyaaSettings
+from kbdex.indexers.nyaa import NyaaAdapter, NyaaSettings, _load_config
 
 
 class SukebeiSettings(NyaaSettings):
-    model_config = SettingsConfigDict(env_prefix="KBDEX_SUKEBEI_", env_file=".env")
-
     base_url: str = "https://sukebei.nyaa.si"
 
 
@@ -14,4 +10,4 @@ class SukebeiAdapter(NyaaAdapter):
     display_name = "Sukebei Nyaa.si"
 
     def __init__(self) -> None:
-        super().__init__(SukebeiSettings())
+        super().__init__(SukebeiSettings(**_load_config("sukebei", SukebeiSettings())))

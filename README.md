@@ -8,9 +8,29 @@ A self-hosted API that finds anime torrents by AniDB ID.
 
 ## How it works
 
+Search by any anime database ID — AniDB, MAL, AniList, Kitsu, TVDB, and more. kbdex resolves it to an AniDB ID, looks up all known title variants, searches the configured indexers, and parses each torrent filename to filter and rank results by season and episode.
+
 ```
-AniDB ID  ──►  resolve titles  ──►  build queries  ──►  search Nyaa.si  ──►  JSON results
+MAL ID / AniList ID / ...
+        │
+        ▼
+ anime-lists mapping  ──►  AniDB ID  ──►  resolve titles  ──►  search indexers
+                                                                      │
+                                                                      ▼
+                                                              parse filenames (anitopy + guessit)
+                                                                      │
+                                                                      ▼
+                                                              filter by season / episode
+                                                                      │
+                                                                      ▼
+                                                                JSON results
 ```
+
+**At startup**, kbdex downloads two data files into the configured data directory and refreshes them weekly:
+- **AniDB titles dump** — maps AniDB IDs to all known title variants (romanised, Japanese, English, synonyms)
+- **anime-lists** ([Fribb/anime-lists](https://github.com/Fribb/anime-lists)) — maps MAL, AniList, Kitsu, TVDB, AniSearch, ANN, LiveChart, and Simkl IDs to AniDB IDs
+
+**At search time**, the resolved titles are sent to each indexer (Nyaa.si, Sukebei by default). Every torrent filename is parsed with [anitopy](https://github.com/igorcmoura/anitopy) (with [guessit](https://github.com/guessit-io/guessit) as a fallback) to extract episode number, season, resolution, codec, and release group. Results are filtered to match the requested season/episode and sorted so exact episode matches rank above batch releases.
 
 ---
 
@@ -38,35 +58,12 @@ The API will be available at `http://localhost:8000`.
 
 ## Configuration
 
-All settings use the `KBDEX_` prefix and can be set as environment variables or in a `.env` file.
+All settings are stored as XML files under the data volume and can be edited directly or via the web UI at `/ui/settings`.
 
-| Variable | Default | Description |
-|---|---|---|
-| `KBDEX_DATA_DIR` | `data` | Directory for persistent data (AniDB dump, caches) |
-| `KBDEX_ANIDB_DUMP_URL` | `https://anidb.net/api/anime-titles.dat.gz` | URL to fetch the AniDB titles dump from |
-| `KBDEX_DUMP_REFRESH_INTERVAL_SECONDS` | `604800` (7 days) | How often to refresh the AniDB dump |
-| `KBDEX_TITLE_CACHE_TTL_SECONDS` | `2592000` (30 days) | TTL for resolved title cache |
-| `KBDEX_SEARCH_CACHE_TTL_SECONDS` | `7200` (2 hours) | TTL for search result cache |
-| `KBDEX_NYAA_BASE_URL` | `https://nyaa.si` | Nyaa.si base URL |
-| `KBDEX_NYAA_MIN_REQUEST_INTERVAL_MS` | `2000` | Minimum delay between Nyaa requests (ms) |
-| `KBDEX_NYAA_MAX_RETRIES` | `3` | Max retries on failed Nyaa requests |
-| `KBDEX_NYAA_BACKOFF_BASE_MS` | `1000` | Base backoff delay for retries (ms) |
-| `KBDEX_NYAA_CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before circuit breaker opens |
-| `KBDEX_NYAA_CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `60` | Circuit breaker cooldown period |
-| `KBDEX_NYAA_REQUEST_TIMEOUT_SECONDS` | `10.0` | Timeout per Nyaa request (seconds) |
-| `KBDEX_NYAA_MAX_PAGES` | `3` | Max Nyaa result pages to fetch per query (75 results/page) |
+| File | Contains |
+|---|---|
+| `data/config/app.xml` | AniDB/anime-lists URLs, refresh intervals, cache TTLs |
+| `data/config/nyaa.xml` | Nyaa.si base URL, max pages, rate limiting, timeouts |
+| `data/config/sukebei.xml` | Same as above for Sukebei |
 
-Example with Docker Compose:
-
-```yaml
-services:
-  kbdex:
-    image: ghcr.io/kingbenny101/kbdex:latest
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-    environment:
-      KBDEX_NYAA_MAX_PAGES: "5"
-      KBDEX_SEARCH_CACHE_TTL_SECONDS: "3600"
-```
+Config files are created with defaults on first start. There are no environment variables.

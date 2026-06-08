@@ -9,7 +9,7 @@ from typing import Optional
 import httpx
 
 from kbdex.cache import title_cache
-from kbdex.config import settings
+from kbdex.config import DATA_DIR, settings
 from kbdex.exceptions import AniDBIDNotFoundError, DumpNotReadyError
 from kbdex.models import TitleEntry
 
@@ -55,8 +55,8 @@ class AniDBDump:
             await self._load()
 
     async def _load(self) -> None:
-        settings.data_dir.mkdir(parents=True, exist_ok=True)
-        dump_path = settings.data_dir / "anime-titles.dat.gz"
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        dump_path = DATA_DIR / "anime-titles.dat.gz"
 
         if not dump_path.exists() or self._is_stale(dump_path):
             await self._download(dump_path)

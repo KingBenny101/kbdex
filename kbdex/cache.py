@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from kbdex.config import settings
+from kbdex.config import DATA_DIR, settings
 
 
 class TTLCache:
@@ -85,7 +85,7 @@ class DiskSearchCache:
 
 title_cache: TTLCache = TTLCache(settings.title_cache_ttl_seconds)
 search_cache: TTLCache = TTLCache(settings.search_cache_ttl_seconds)
-disk_search_cache: DiskSearchCache = DiskSearchCache(settings.data_dir, settings.search_cache_ttl_seconds)
+disk_search_cache: DiskSearchCache = DiskSearchCache(DATA_DIR, settings.search_cache_ttl_seconds)
 
 
 def make_search_cache_key(query: str, indexer: str) -> str:

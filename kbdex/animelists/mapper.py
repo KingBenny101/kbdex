@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 import httpx
 
-from kbdex.config import settings
+from kbdex.config import DATA_DIR, settings
 from kbdex.exceptions import AnimeListsNotReadyError, IDMappingNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -65,8 +65,8 @@ class AnimeListMapper:
             await self._load()
 
     async def _load(self) -> None:
-        settings.data_dir.mkdir(parents=True, exist_ok=True)
-        path = settings.data_dir / "anime-list-full.json"
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        path = DATA_DIR / "anime-list-full.json"
 
         if not path.exists() or self._is_stale(path):
             await self._download(path)

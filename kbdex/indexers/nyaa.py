@@ -19,13 +19,14 @@ Nyaa's table structure (8 physical <td> elements per row):
 import asyncio
 import logging
 import re
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 from bs4 import BeautifulSoup, Tag
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel
 
 from kbdex.indexers.base import CircuitBreaker, RateLimiter
 from kbdex.models import IndexerHealth, TorrentResult
@@ -47,9 +48,7 @@ _MAGNET_HREF = re.compile(r"^magnet:")
 _RESULTS_PER_PAGE = 75
 
 
-class NyaaSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="KBDEX_NYAA_", env_file=".env")
-
+class NyaaSettings(BaseModel):
     base_url: str = "https://nyaa.si"
     min_request_interval_ms: int = 2000
     max_retries: int = 3
@@ -58,6 +57,32 @@ class NyaaSettings(BaseSettings):
     circuit_breaker_cooldown_seconds: int = 60
     request_timeout_seconds: float = 10.0
     max_pages: int = 3
+
+
+def _write_config(path: "Path", indexer_name: str, fields: dict) -> None:
+    root = ET.Element("indexer", attrib={"name": indexer_name})
+    for tag, value in fields.items():
+        ET.SubElement(root, tag).text = str(value)
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space="  ")
+    tmp = path.with_suffix(".tmp")
+    tree.write(tmp, encoding="unicode", xml_declaration=True)
+    tmp.replace(path)
+
+
+def _load_config(indexer_name: str, defaults: NyaaSettings) -> dict:
+    """Return settings from data/config/{name}.xml, creating the file with defaults if absent."""
+    from kbdex.config import DATA_DIR
+    config_dir = DATA_DIR / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    path = config_dir / f"{indexer_name}.xml"
+    if not path.exists():
+        _write_config(path, indexer_name, defaults.model_dump())
+    try:
+        root = ET.parse(path).getroot()
+        return {child.tag: child.text for child in root if child.text is not None}
+    except Exception:
+        return {}
 
 
 def _parse_size(size_str: str) -> int:
@@ -155,7 +180,9 @@ class NyaaAdapter:
     supports_torrent_url = True
 
     def __init__(self, cfg: NyaaSettings | None = None) -> None:
-        self._cfg = cfg or NyaaSettings()
+        if cfg is None:
+            cfg = NyaaSettings(**_load_config("nyaa", NyaaSettings()))
+        self._cfg = cfg
         self.base_url = self._cfg.base_url
         self.min_request_interval_ms = self._cfg.min_request_interval_ms
         self.max_retries = self._cfg.max_retries
