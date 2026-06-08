@@ -30,3 +30,22 @@ class DumpNotReadyError(APIError):
             code="DUMP_NOT_READY",
             message="The AniDB titles dump is still loading. Please retry shortly.",
         )
+
+
+class AnimeListsNotReadyError(APIError):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=503,
+            code="ANIMELISTS_NOT_READY",
+            message="The anime-lists mapping is still loading. Please retry shortly.",
+        )
+
+
+class IDMappingNotFoundError(APIError):
+    def __init__(self, id_type: str, id_value: int) -> None:
+        super().__init__(
+            status_code=404,
+            code="ID_MAPPING_NOT_FOUND",
+            message=f"No AniDB ID found for {id_type}={id_value}. This title may not be in the anime-lists mapping.",
+            param=id_type,
+        )

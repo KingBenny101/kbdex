@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from kbdex.anidb.dump import dump
+from kbdex.animelists import mapper
 from kbdex.config import settings
 from kbdex.exceptions import APIError
 from kbdex.routes import health, search, titles
@@ -48,16 +49,29 @@ async def _periodic_dump_refresh() -> None:
             logger.exception("AniDB dump refresh failed")
 
 
+async def _periodic_animelists_refresh() -> None:
+    while True:
+        await asyncio.sleep(settings.animelists_refresh_interval_seconds)
+        try:
+            logger.info("Starting scheduled anime-lists refresh")
+            await mapper.refresh()
+        except Exception:
+            logger.exception("anime-lists refresh failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await dump.ensure_loaded()
-    refresh_task = asyncio.create_task(_periodic_dump_refresh())
+    await asyncio.gather(dump.ensure_loaded(), mapper.ensure_loaded())
+    dump_task = asyncio.create_task(_periodic_dump_refresh())
+    lists_task = asyncio.create_task(_periodic_animelists_refresh())
     yield
-    refresh_task.cancel()
-    try:
-        await refresh_task
-    except asyncio.CancelledError:
-        pass
+    dump_task.cancel()
+    lists_task.cancel()
+    for task in (dump_task, lists_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(

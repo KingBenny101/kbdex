@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     anidb_dump_url: str = "https://anidb.net/api/anime-titles.dat.gz"
     dump_refresh_interval_seconds: int = 7 * 24 * 3600
 
+    animelists_url: str = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json"
+    animelists_refresh_interval_seconds: int = 7 * 24 * 3600
+
     title_cache_ttl_seconds: int = 30 * 24 * 3600
     search_cache_ttl_seconds: int = 2 * 3600
 
