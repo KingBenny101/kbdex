@@ -1,3 +1,4 @@
+import html
 import logging
 from pathlib import Path
 from typing import Optional
@@ -161,5 +162,5 @@ async def settings_post(
     except Exception as exc:
         logger.exception("Failed to save settings")
         return HTMLResponse(
-            f'<p style="color:var(--pico-del-color)">Error: {exc}</p>'
+            f'<p style="color:var(--pico-del-color)">Error: {html.escape(str(exc))}</p>'
         )
