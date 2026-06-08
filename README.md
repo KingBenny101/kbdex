@@ -30,7 +30,7 @@ MAL ID / AniList ID / ...
 - **AniDB titles dump** — maps AniDB IDs to all known title variants (romanised, Japanese, English, synonyms)
 - **anime-lists** ([Fribb/anime-lists](https://github.com/Fribb/anime-lists)) — maps MAL, AniList, Kitsu, TVDB, AniSearch, ANN, LiveChart, and Simkl IDs to AniDB IDs
 
-**At search time**, the resolved titles are sent to each indexer (Nyaa.si, Sukebei by default). Every torrent filename is parsed with [anitopy](https://github.com/igorcmoura/anitopy) (with [guessit](https://github.com/guessit-io/guessit) as a fallback) to extract episode number, season, resolution, codec, and release group. Results are filtered to match the requested season/episode and sorted so exact episode matches rank above batch releases.
+**At search time**, the resolved titles are sent to each indexer. Every torrent filename is parsed with [anitopy](https://github.com/igorcmoura/anitopy) (with [guessit](https://github.com/guessit-io/guessit) as a fallback) to extract episode number, season, resolution, codec, and release group. Results are filtered to match the requested season/episode and sorted so exact episode matches rank above batch releases.
 
 ---
 
@@ -71,6 +71,17 @@ All settings are stored as XML files under the data volume and can be edited dir
 | `data/config/sukebei.xml` | Same as above for Sukebei |
 
 Config files are created with defaults on first start. There are no environment variables.
+
+---
+
+## Indexers
+
+| Indexer | URL |
+|---|---|
+| Nyaa.si | [nyaa.si](https://nyaa.si) |
+| Sukebei | [sukebei.nyaa.si](https://sukebei.nyaa.si) |
+
+Both are enabled by default. Each can be excluded per-request via the `indexers` parameter, or disabled entirely by setting an unreachable base URL in its config file.
 
 ---
 
