@@ -31,6 +31,20 @@ The app will be available at `http://localhost:8000`. API docs are at `/docs`.
 
 ---
 
+## Development
+
+Requires [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync          # install dependencies from uv.lock
+uv run pytest    # run tests
+uv run kbdex     # start the server on 0.0.0.0:8000
+```
+
+Or use the Makefile targets: `make dev` (auto-reload), `make test`, `make up`.
+
+---
+
 ## How it works
 
 Search by title or any anime database ID — AniDB, MAL, AniList, Kitsu, TVDB, and more. kbdex resolves it to an AniDB ID, looks up all known title variants, searches the configured indexers, and parses each torrent filename to filter and rank results by season and episode.

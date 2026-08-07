@@ -1,9 +1,10 @@
-.venv:
-	python3 -m venv .venv
-	.venv/bin/pip install -r requirements.txt
+.PHONY: dev test up down release
 
-dev: .venv
-	.venv/bin/uvicorn kbdex.main:app --reload --reload-dir kbdex --host 0.0.0.0 --port 8000
+dev:
+	uv run uvicorn kbdex.main:app --reload --reload-dir src/kbdex --host 0.0.0.0 --port 8000
+
+test:
+	uv run pytest
 
 up:
 	docker compose up --build
@@ -13,5 +14,3 @@ down:
 
 release:
 	scripts/release.sh
-
-.PHONY: dev up down release

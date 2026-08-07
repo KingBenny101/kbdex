@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="v$(python3 -c "import re; print(re.search(r'__version__\s*=\s*[\"\'](.*?)[\"\']', open('kbdex/__init__.py').read()).group(1))")"
+VERSION="v$(python3 -c "import re; print(re.search(r'__version__\s*=\s*[\"\'](.*?)[\"\']', open('src/kbdex/__init__.py').read()).group(1))")"
 
 echo "Releasing $VERSION"
 

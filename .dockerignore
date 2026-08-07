@@ -1,0 +1,8 @@
+.venv/
+data/
+.git/
+.gitignore
+Dockerfile
+docker-compose.yml
+tests/
+scripts/

@@ -1,0 +1,35 @@
+[project]
+name = "kbdex"
+version = "0.2.0"
+description = "Anime torrent search API — resolves AniDB IDs to torrent metadata"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "KingBenny101", email = "47111832+KingBenny101@users.noreply.github.com" }
+]
+dependencies = [
+    "anitopy>=2.1",
+    "beautifulsoup4>=4.12",
+    "fastapi>=0.115.0",
+    "guessit>=3.8",
+    "httpx>=0.28.0",
+    "jinja2>=3.1",
+    "pydantic>=2.10.0",
+    "python-multipart>=0.0.9",
+    "uvicorn[standard]>=0.32.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+kbdex = "kbdex.main:main"
+
+[build-system]
+requires = ["uv_build>=0.11.29,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
