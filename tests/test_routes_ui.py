@@ -39,7 +39,7 @@ def test_ui_free_text_with_season_filter(monkeypatch) -> None:
         response = client.post("/ui/search", data=_form_payload(season="1"))
 
     assert response.status_code == 200
-    assert "season" not in response.text
+    assert "That didn't work" not in response.text
     assert captured["params"].season == 1
     assert captured["params"].q == "attack on titan"
 
@@ -79,6 +79,6 @@ def test_ui_free_text_ignores_stale_season_when_cleared(monkeypatch) -> None:
         response = client.post("/ui/search", data=_form_payload(season="", episode=""))
 
     assert response.status_code == 200
-    assert "season" not in response.text
+    assert "That didn't work" not in response.text
     assert captured["params"].season is None
     assert captured["params"].episode is None

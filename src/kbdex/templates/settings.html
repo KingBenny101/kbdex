@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<p style="color: var(--pico-muted-color); font-size: 0.875rem;">Default work fine, change these only if you know what you're doing.</p>
+<p class="settings-note">Defaults work fine — change these only if you know what you're doing.</p>
 
 <div id="settings-feedback"></div>
 
@@ -33,6 +33,6 @@
     <input type="number" name="sukebei_max_pages" id="sukebei-max-pages" min="1" max="20" value="{{ sukebei.max_pages }}">
   </div>
 
-  <button type="submit" style="margin-top:1rem;">Save</button>
+  <button type="submit" class="cta">Save changes</button>
 </form>
 {% endblock %}

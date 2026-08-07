@@ -3,18 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>kbdex</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
-  <nav>
-    <a href="/ui/search" class="brand">kbdex</a>
-    <a href="/ui/search" {% if active == 'search' %}class="active"{% endif %}>Search</a>
-    <a href="/ui/settings" {% if active == 'settings' %}class="active"{% endif %}>Settings</a>
-    <a href="/docs" target="_blank" rel="noopener">API docs ↗</a>
-  </nav>
-  <main>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="/ui/search" class="brand"><span class="brand-mark"></span>kbdex</a>
+      <nav class="navlinks">
+        <a href="/ui/search" {% if active == 'search' %}class="active"{% endif %}>Search</a>
+        <a href="/ui/settings" {% if active == 'settings' %}class="active"{% endif %}>Settings</a>
+        <a href="/docs" target="_blank" rel="noopener">API docs ↗</a>
+      </nav>
+    </div>
+  </header>
+  <main class="page">
     {% block content %}{% endblock %}
   </main>
   <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>

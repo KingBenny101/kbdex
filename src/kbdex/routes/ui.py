@@ -173,11 +173,9 @@ async def settings_post(
 
         save_app_settings(search_cache_ttl_seconds=max(60, search_cache_ttl_seconds))
         reload_indexers()
-        return HTMLResponse(
-            '<p style="color:var(--pico-ins-color)">Settings saved. Adapters reloaded.</p>'
-        )
+        return HTMLResponse('<p class="ok">Settings saved. Adapters reloaded.</p>')
     except Exception as exc:
         logger.exception("Failed to save settings")
         return HTMLResponse(
-            f'<p style="color:var(--pico-del-color)">Error: {html.escape(str(exc))}</p>'
+            f'<p class="bad">Error: {html.escape(str(exc))}</p>'
         )

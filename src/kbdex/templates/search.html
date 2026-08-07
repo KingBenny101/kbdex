@@ -6,48 +6,56 @@
   hx-swap="innerHTML"
   hx-indicator="#search-spinner"
 >
-  <label for="id-value">Anime ID</label>
-  <div class="id-row">
-    <select name="id_type" id="id-type">
-      <option value="anidb_id">AniDB</option>
-      <option value="mal_id">MyAnimeList</option>
-      <option value="anilist_id">AniList</option>
-      <option value="kitsu_id">Kitsu</option>
-      <option value="tvdb_id">TVDB</option>
-      <option value="anisearch_id">AniSearch</option>
-      <option value="animenewsnetwork_id">ANN</option>
-      <option value="livechart_id">LiveChart</option>
-      <option value="simkl_id">Simkl</option>
-    </select>
-    <input type="number" name="id_value" id="id-value" min="1" placeholder="ID">
-  </div>
+  <div class="finder">
+    <div class="finder-line">
+      <div class="finder-idbox">
+        <label class="sr-only" for="id-type">ID type</label>
+        <select name="id_type" id="id-type">
+          <option value="anidb_id">AniDB</option>
+          <option value="mal_id">MyAnimeList</option>
+          <option value="anilist_id">AniList</option>
+          <option value="kitsu_id">Kitsu</option>
+          <option value="tvdb_id">TVDB</option>
+          <option value="anisearch_id">AniSearch</option>
+          <option value="animenewsnetwork_id">ANN</option>
+          <option value="livechart_id">LiveChart</option>
+          <option value="simkl_id">Simkl</option>
+        </select>
 
-  <label for="q">Or free-text search</label>
-  <input type="text" name="q" id="q" placeholder="e.g. Attack on Titan">
+        <input type="number" name="id_value" class="mono" id="id-value" min="1" placeholder="1234" aria-label="Anime ID">
+      </div>
 
-  <div class="filters">
-    <div>
-      <label for="season">Season</label>
-      <input type="number" name="season" id="season" min="1" placeholder="—">
+      <span class="finder-or">or</span>
+
+      <input type="text" name="q" class="finder-q" id="q" placeholder="search a title — e.g. Attack on Titan">
     </div>
-    <div>
-      <label for="episode">Episode</label>
-      <input type="number" name="episode" id="episode" min="1" placeholder="—">
-    </div>
-    <div>
-      <label>Indexers</label>
-      <div class="indexer-checks">
+
+    <div class="finder-filters">
+      <div class="filter">
+        <label for="season">Season</label>
+        <input type="number" name="season" class="mono" id="season" min="1" placeholder="—">
+      </div>
+      <div class="filter">
+        <label for="episode">Episode</label>
+        <input type="number" name="episode" class="mono" id="episode" min="1" placeholder="—">
+      </div>
+
+      <div class="filter indexers">
+        <span class="filter-label">Indexers</span>
         {% for name in indexers %}
-        <label><input type="checkbox" name="indexers" value="{{ name }}" checked> {{ name }}</label>
+        <label class="indexer-pill">
+          <input type="checkbox" name="indexers" value="{{ name }}" checked>
+          {{ name }}
+        </label>
         {% endfor %}
       </div>
+
+      <button type="submit" class="cta">
+        Find
+        <span id="search-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
     </div>
   </div>
-
-  <button type="submit">
-    Search
-    <span id="search-spinner" class="htmx-indicator"><span class="spinner"></span></span>
-  </button>
 </form>
 
 <div id="results"></div>
