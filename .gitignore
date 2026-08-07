@@ -12,3 +12,5 @@ __pycache__/
 .pytest_cache/
 .coverage
 openapi.json
+### Playwright MCP artifacts
+.playwright-mcp/

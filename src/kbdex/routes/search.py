@@ -82,18 +82,18 @@ async def search(
             "MISSING_REQUIRED_PARAM",
             "At least one of 'anidb_id', a foreign ID param (mal_id, anilist_id, ...), or 'q' must be provided.",
         )
-    if season is not None and anidb_id is None:
+    if season is not None and anidb_id is None and q is None:
         raise APIError(
             422,
             "INVALID_PARAM_COMBO",
-            "'season' is only meaningful when an ID param is also provided.",
+            "'season' requires an ID or a search query.",
             param="season",
         )
-    if episode is not None and season is None:
+    if episode is not None and season is None and anidb_id is None and q is None:
         raise APIError(
             422,
             "INVALID_PARAM_COMBO",
-            "'episode' requires 'season' to also be provided.",
+            "'episode' requires 'season', an ID, or a search query.",
             param="episode",
         )
     unknown = [i for i in indexers if i not in list_indexers()]

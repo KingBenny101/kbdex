@@ -82,18 +82,18 @@ async def search_post(
             id_type_key, id_val_key = next(iter(foreign.items()))
             anidb_id = mapper.resolve(id_type_key, id_val_key)
 
-        if season_val is not None and anidb_id is None:
+        if season_val is not None and anidb_id is None and q_val is None:
             raise APIError(
                 422,
                 "INVALID_PARAM_COMBO",
-                "'season' is only meaningful when an ID param is also provided.",
+                "'season' requires an ID or a search query.",
                 param="season",
             )
-        if episode_val is not None and season_val is None:
+        if episode_val is not None and season_val is None and anidb_id is None and q_val is None:
             raise APIError(
                 422,
                 "INVALID_PARAM_COMBO",
-                "'episode' requires 'season' to also be provided.",
+                "'episode' requires 'season', an ID, or a search query.",
                 param="episode",
             )
 
