@@ -211,11 +211,14 @@ async def _search_one(
         # Serialise to JSON-compatible dicts (mode="json" converts datetime → ISO string)
         result_dicts = [r.model_dump(mode="json") for r in results]
 
-        if anidb_id is not None:
-            disk_search_cache.set(anidb_id, indexer_name, result_dicts)
-        else:
-            cache_key = make_search_cache_key(query, indexer_name)
-            search_cache.set(cache_key, result_dicts, settings.search_cache_ttl_seconds)
+        try:
+            if anidb_id is not None:
+                disk_search_cache.set(anidb_id, indexer_name, result_dicts)
+            else:
+                cache_key = make_search_cache_key(query, indexer_name)
+                search_cache.set(cache_key, result_dicts, settings.search_cache_ttl_seconds)
+        except Exception as exc:
+            logger.warning("Failed to cache results for %s: %s", indexer_name, exc)
 
         return result_dicts, False, None
     except RuntimeError as exc:
